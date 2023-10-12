@@ -2,6 +2,7 @@ provider "aws" {
     region="ap-southeast-1"
 }
 
+variable private_key_location {}
 variable public_key_location {}
 variable vpc_cidr_block {}
 variable subnet_cidr_block {}
@@ -147,7 +148,41 @@ resource "aws_instance" "myapp-server" {
     availability_zone = var.avail_zone
     associate_public_ip_address = true
     key_name = aws_key_pair.ssh-key.key_name
-    user_data = file("entry-script.sh")
+    # user_data = file("entry-script.sh")
+    connection {
+        type = "ssh"
+        host = self.public_ip
+        user = "ec2-user"
+        private_key = file(var.private_key_location)
+    }
+
+    provisioner "file" {
+        source= "entry-script.sh"
+        destination = "/home/ec2-user/entry-script.sh"
+    }
+    # to copy this same file to another server
+    # provisioner "file" {
+    #     source= "entry-script.sh"
+    #     destination = "/home/ec2-user/entry-script.sh"
+    #     connection {
+    #         type = "ssh"
+    #         host = self.public_ip
+    #         user = "ec2-user"
+    #         private_key = file(var.private_key_location)
+    #     }
+    # }
+    provisioner "local-exec" {
+        command = "echo ${self.public_ip} > output.txt"
+    }
+
+    provisioner "remote-exec" {
+        # inline = [
+        #     "export ENV=dev",
+        #     "mkdir newdir",
+        # ]
+        # this must be existed on the remote server not on the local machine. so we need to copy it to the remote server first
+        script = file("entry-script.sh")
+    }
     tags = {
         Name= "${var.env_prefix}-dev-server"
     }
